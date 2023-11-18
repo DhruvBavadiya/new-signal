@@ -14,7 +14,7 @@ app.use(cors());
 app.use(express.json());
 
 // mongoose connections.
-mongoose.connect('mongodb+srv://bavadiyadhruv:TL1zO2Vscn4QMTA1@databse1.1iownrz.mongodb.net/').then(() => {
+mongoose.connect(process.env.DB_URL).then(() => {
   console.log('mongoose connected');
 });
 
@@ -25,8 +25,8 @@ io.on('connection', (socket) => {
 
 app.use('/app/p1', signalRoutes);
 
-server.listen(5000, () => {
-  console.log(`Server is running on port 5000`);
+server.listen(process.env.PORT, () => {
+  console.log(`Server is running on port ${process.env.PORT}`);
 });
 
 module.exports = {
