@@ -42,7 +42,22 @@ const trafficSignalSchema = new mongoose.Schema({
     enum: ['crossroads with traffic light', 'T-junction with traffic light'],
     required: true,
   },
+
   aspects: {
+    red:{
+      type:Number,
+      default:90
+    },
+
+    yellow:{
+      type:Number,
+      default:5
+    },
+    green:{
+      type:Number,
+      default:30
+    },
+
     currentColor: {
       type: String,
       enum: ['red', 'yellow', 'green'],

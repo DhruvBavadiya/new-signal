@@ -32,3 +32,17 @@ exports.getCircle = catcherror(async (req, res, next) => {
     return next(new ErrorHandler("No circle for this id.", 401));
   }
 });
+
+
+exports.getAllCircle = catcherror(async (req,res,next)=>{
+  const circle = await Circle.find();
+
+  if(circle){
+    res.status(200).json({
+      success: true,
+      circle,
+    });
+  } else {
+    return next(new ErrorHandler("No circle found.", 401));
+  }
+})
