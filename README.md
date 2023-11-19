@@ -45,14 +45,6 @@
 - **Method:** GET
 - **Description:** Retrieves information about all signals.
 
-### Get Signal by ID
-
-- **Route:** `/get-signal/:Id`
-- **Method:** GET
-- **Description:** Retrieves information about a specific signal.
-- **Request Parameters:**
-  - `Id` (String): The ID of the signal.
-
 ### Get Signals by Coordinates
 
 - **Route:** `/get-signal/bycoordinates`
@@ -110,6 +102,14 @@
 - **Description:** Retrieves information about a specific circle.
 - **Request Body:**
   - `circleId` (String): The ID of the circle.
+
+### Get Signal by ID
+
+- **Route:** `/get-signal/byId`
+- **Method:** GET
+- **Description:** Retrieves information about a specific signal.
+- **Request Body:**
+  - `signalId` (String): The ID of the circle.
 
 ### Get All Circles
 
