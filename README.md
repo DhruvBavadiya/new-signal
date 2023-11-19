@@ -109,7 +109,7 @@
 - **Method:** GET
 - **Description:** Retrieves information about a specific signal.
 - **Request Body:**
-  - `signalId` (String): The ID of the circle.
+  - `signalId` (String): The ID of the signal.
 
 ### Get All Circles
 
