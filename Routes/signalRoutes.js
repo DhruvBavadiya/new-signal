@@ -1,5 +1,5 @@
 const express = require("express");
-const { addSignalLightData, signalByCoordinates, getAll, getSignalById, updateSignal, getSignalsByCircleId, liveUpdateSignal } = require("../Controller/SignalLightController");
+const { addSignalLightData, signalByCoordinates, getAll, getSignalById, updateSignal, getSignalsByCircleId, liveUpdateSignal, signalOff, signalOn } = require("../Controller/SignalLightController");
 const { addCircle, getCircle, getAllCircle } = require("../Controller/circleController");
 const router = express.Router()
 
@@ -11,6 +11,8 @@ router.route('/get-signal/bycircle').post(getSignalsByCircleId)
 router.route('/get-signal').get(getAll)
 router.route('/get-circle/byId').post(getCircle)
 router.route('/get-circle').get(getAllCircle)
+router.route('/off-signal/:signalId').get(signalOff)
+router.route('/on-signal/:signalId').get(signalOn)
 router.route('/get-signal/byId').post(getSignalById)
 router.route('/update-signal/:Id').put(updateSignal)
 router.route('/live-update/:Id').put(liveUpdateSignal)

@@ -4,6 +4,7 @@ const circleSchema = new mongoose.Schema({
   circleId: {
     type: String,
     required: true,
+    
   },
   numberOfSignals: {
     type: Number,

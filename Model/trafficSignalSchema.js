@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
 const trafficSignalSchema = new mongoose.Schema({
   location: {
@@ -39,28 +39,28 @@ const trafficSignalSchema = new mongoose.Schema({
   },
   junctionType: {
     type: String,
-    enum: ['crossroads with traffic light', 'T-junction with traffic light'],
+    enum: ["crossroads with traffic light", "T-junction with traffic light"],
     required: true,
   },
 
   aspects: {
-    red:{
-      type:Number,
-      default:90
+    red: {
+      type: Number,
+      default: 90,
     },
 
-    yellow:{
-      type:Number,
-      default:5
+    yellow: {
+      type: Number,
+      default: 5,
     },
-    green:{
-      type:Number,
-      default:30
+    green: {
+      type: Number,
+      default: 30,
     },
 
     currentColor: {
       type: String,
-      enum: ['red', 'yellow', 'green'],
+      enum: ["red", "yellow", "green"],
       required: true,
     },
     durationInSeconds: {
@@ -70,13 +70,13 @@ const trafficSignalSchema = new mongoose.Schema({
   },
   signalStatus: {
     type: String,
-    enum: ['working', 'notWorking'],
-    default: 'working',
+    enum: ["working", "notworking"],
+    default: "working",
   },
   signalId: {
     type: String, // Adjust the type accordingly (String, ObjectId, etc.)
     required: true,
-    unique:true,
+    unique: true,
   },
   circleId: {
     type: String, // Adjust the type accordingly (String, ObjectId, etc.)
@@ -90,16 +90,24 @@ const trafficSignalSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+  signalNotWorking: {
+    signalOfftime: {
+      type: Date,
+    },
+    signalOfftime: {
+      type: Date,
+    },
+  },
 });
 
 // Update the updatedAt field before saving the document, only if it's an update
-trafficSignalSchema.pre('save', function (next) {
+trafficSignalSchema.pre("save", function (next) {
   if (this.isModified()) {
     this.updatedAt = new Date();
   }
   next();
 });
 
-const TrafficSignal = mongoose.model('TrafficSignal', trafficSignalSchema);
+const TrafficSignal = mongoose.model("TrafficSignal", trafficSignalSchema);
 
 module.exports = TrafficSignal;
