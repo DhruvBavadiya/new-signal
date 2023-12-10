@@ -65,18 +65,17 @@ exports.updateSignal = async (req, res) => {
 
 exports.getAll = catcherror(async (req, res, next) => {
   const signals = await TrafficSignal.find();
-  // const newsignals = signals.filter((signal)=>signal.signalStatus == "working")
+  const newsignals = signals.filter((signal)=>signal.signalStatus == "working")
   if (newsignals) {
     newsignals.forEach((signal) => {
-      const elapsedTime = getElapsedTime(signal);
-
-      const liveTime = getTrafficLightStatus(
-        elapsedTime,
-        signal.aspects.currentColor,
-        signal.aspects.durationInSeconds
-      );
-      signal.aspects.currentColor = liveTime.color;
-      signal.aspects.durationInSeconds = liveTime.duration;
+    const elapsedTime = getElapsedTime(signal);
+    const liveTime = getTrafficLightStatus(
+      elapsedTime,
+      signal.aspects.currentColor,
+      signal.aspects.durationInSeconds
+    );
+    signal.aspects.currentColor = liveTime.color;
+    signal.aspects.durationInSeconds = liveTime.duration;
     });
 
     res.status(200).json({
@@ -87,8 +86,6 @@ exports.getAll = catcherror(async (req, res, next) => {
     next(new ErrorHandler("Can't get Place"));
   }
 });
-
-
 
 
 exports.getSignalById = catcherror(async (req, res, next) => {
@@ -151,8 +148,6 @@ exports.signalOn = catcherror(async(req,res,next)=>{
       signal
     })
 
-    
-
 })
 
 // process of finding elapsedTime
@@ -161,47 +156,88 @@ function getElapsedTime(signal) {
   const currentTime = new Date().getTime();
   const lastUpdateTime = new Date(signal.updatedAt).getTime();
   const elapsedTime = (currentTime - lastUpdateTime) / 1000;
-  return elapsedTime;
+  return Math.floor(elapsedTime);
 }
+
+// function getTrafficLightStatus(elapsedTime, initialColor, initialDuration) {
+//   // Define the durations for each color
+//   const redDuration = 90;
+//   const yellowDuration = 5;
+//   const greenDuration = 30;
+
+//   // Calculate the total cycle duration
+//   const totalCycleDuration = redDuration + greenDuration + yellowDuration;
+//   console.log("total cycle duration",totalCycleDuration)
+//   // Calculate the current cycle number
+//   const currentCycle = Math.floor(elapsedTime / totalCycleDuration);
+//   console.log("currentcycle",currentCycle)
+
+//   // Calculate the remaining time within the current cycle
+//   const remainingTimeInCycle = elapsedTime % totalCycleDuration;
+
+//   console.log("remaining time",remainingTimeInCycle)
+//   // Determine the current color and duration based on the remaining time
+//   let currentColor, currentDuration;
+//   if (remainingTimeInCycle < initialDuration) {
+//     currentColor = initialColor;
+//     currentDuration = initialDuration - remainingTimeInCycle;
+//   } else if (remainingTimeInCycle < greenDuration + initialDuration) {
+//     currentColor = "green";
+//     currentDuration = greenDuration - (remainingTimeInCycle - initialDuration);
+//   } else if (remainingTimeInCycle < totalCycleDuration) {
+//     currentColor = "yellow";
+//     currentDuration =
+//       yellowDuration - (remainingTimeInCycle - (greenDuration + initialDuration));
+//   } else {
+//     currentColor = "red";
+//     currentDuration =
+//       redDuration - (remainingTimeInCycle - (totalCycleDuration));
+//   }
+//   console.log("currenColor",currentColor)
+//   console.log("duration",currentDuration)
+
+//   return {
+//     color: currentColor,
+//     duration: Math.floor(currentDuration), // Ensure the duration is non-negative
+//   };
+// }
 
 function getTrafficLightStatus(elapsedTime, initialColor, initialDuration) {
   // Define the durations for each color
   const redDuration = 90;
   const yellowDuration = 5;
   const greenDuration = 30;
+  
+  let elapTime = elapsedTime;
+  let curcolor = initialColor;
+  let colorduration = initialDuration;
 
-  // Calculate the total cycle duration
-  const totalCycleDuration = redDuration + yellowDuration + greenDuration;
-
-  // Calculate the current cycle number
-  const currentCycle = Math.floor(elapsedTime / totalCycleDuration);
-
-  // Calculate the remaining time within the current cycle
-  const remainingTimeInCycle = elapsedTime % totalCycleDuration;
-
-  // Determine the current color and duration based on the remaining time
-  let currentColor, currentDuration;
-  if (remainingTimeInCycle < initialDuration) {
-    currentColor = initialColor;
-    currentDuration = initialDuration - remainingTimeInCycle;
-  } else if (remainingTimeInCycle < redDuration) {
-    currentColor = "red";
-    currentDuration = redDuration - (remainingTimeInCycle - initialDuration);
-  } else if (remainingTimeInCycle < redDuration + yellowDuration) {
-    currentColor = "yellow";
-    currentDuration =
-      yellowDuration - (remainingTimeInCycle - (redDuration + initialDuration))-90;
-  } else {
-    currentColor = "green";
-    currentDuration =
-      greenDuration - (remainingTimeInCycle - (redDuration + yellowDuration));
+  while (elapTime >= colorduration) {
+    if (curcolor === "green") {
+      curcolor = "yellow";
+      elapTime -= colorduration;
+      colorduration = 5;
+    } else if (curcolor === "yellow") {
+      curcolor = "red";
+      elapTime -= colorduration;
+      colorduration = 90;
+    } else {
+      curcolor = "green";
+      elapTime -= colorduration;
+      colorduration = 30;
+    }
   }
 
-  return {
-    color: currentColor,
-    duration: Math.max(0, Math.floor(currentDuration)), // Ensure the duration is non-negative
-  };
+  if (elapTime < colorduration) {
+    colorduration -= elapTime; // Corrected subtraction
+    return {
+      color: curcolor,
+      duration: Math.floor(colorduration), // Ensure the duration is non-negative
+    };
+  }
 }
+
+
 
 function calculateDistance(lat1, lon1, lat2, lon2) {
   const R = 6371; // Radius of the Earth in kilometers
@@ -297,7 +333,7 @@ exports.getSignalsByCircleId = catcherror(async (req, res) => {
 
 exports.liveUpdateSignal = catcherror(async (req, res) => {
   const { durationInSeconds, currentColor } = req.body;
-
+  console.log(durationInSeconds)
   try {
     const updatedSignal = await TrafficSignal.findByIdAndUpdate(
       req.params.Id,
