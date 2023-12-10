@@ -24,6 +24,11 @@ io.on('connection', (socket) => {
 });
 
 app.use('/app/p1', signalRoutes);
+app.get("/healthz",(req,res)=>{
+  res.status(201).json({
+    success:true
+  })
+})
 
 server.listen(process.env.PORT, () => {
   console.log(`Server is running on port ${process.env.PORT}`);
