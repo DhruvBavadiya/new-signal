@@ -46,3 +46,17 @@ exports.getAllCircle = catcherror(async (req,res,next)=>{
     return next(new ErrorHandler("No circle found.", 401));
   }
 })
+
+exports.DeleteCircle = catcherror(async(req,res,next)=>{
+  const {circleId} = req.body
+  const circle = await Circle.deleteOne({circleId:circleId})
+
+  if(!circle){
+    return next(new ErrorHandler("No circle found.", 401));
+  }
+
+  res.status(200).json({
+    success:true
+  })
+
+})
