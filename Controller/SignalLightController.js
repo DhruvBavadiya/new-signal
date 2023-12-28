@@ -203,9 +203,9 @@ function getElapsedTime(signal) {
 
 function getTrafficLightStatus(elapsedTime, initialColor, initialDuration) {
   // Define the durations for each color
-  const redDuration = 90;
+  const redDuration = 80;
   const yellowDuration = 5;
-  const greenDuration = 30;
+  const greenDuration = 20;
   
   let elapTime = elapsedTime;
   let curcolor = initialColor;
@@ -219,11 +219,11 @@ function getTrafficLightStatus(elapsedTime, initialColor, initialDuration) {
     } else if (curcolor === "yellow") {
       curcolor = "red";
       elapTime -= colorduration;
-      colorduration = 90;
+      colorduration = 80;
     } else {
       curcolor = "green";
       elapTime -= colorduration;
-      colorduration = 30;
+      colorduration = 20;
     }
   }
 
