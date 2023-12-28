@@ -2,7 +2,6 @@ const catcherror = require("../Middleware/catcherror");
 const ErrorHandler = require("../Utils/errorHandler");
 const TrafficSignal = require("../Model/trafficSignalSchema");
 const Circle = require("../Model/circleSchema");
-const { io } = require("../app");
 
 exports.addSignalLightData = catcherror(async (req, res, next) => {
   try {
@@ -350,3 +349,7 @@ exports.liveUpdateSignal = catcherror(async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
+
+
+
+
