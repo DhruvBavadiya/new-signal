@@ -90,6 +90,12 @@ exports.getAll = catcherror(async (req, res, next) => {
 exports.getSignalById = catcherror(async (req, res, next) => {
     const signalId = req.body.signalId;
     const signal = await TrafficSignal.findOne({ signalId });
+    if (!signal) {
+      return(
+      res.status(401).json({
+        message:"signal not found"
+      }))
+    }
   if(signal.signalStatus=="notworking"){
     return res.status(201).json({
       success:true,
@@ -97,9 +103,6 @@ exports.getSignalById = catcherror(async (req, res, next) => {
       signal
     })
   }
-    if (!signal) {
-      return next(new ErrorHandler("Signal not found"));
-    }
 
     const elapsedTime = getElapsedTime(signal);
 
@@ -351,5 +354,26 @@ exports.liveUpdateSignal = catcherror(async (req, res) => {
 });
 
 
+exports.DeleteSignal = catcherror(async(req,res)=>{
+  const SignalId = req.body.SignalId;
+  const signal = await TrafficSignal.findOne({signalId:SignalId})
+  if(signal){
+  const response = await TrafficSignal.deleteOne({signalId:SignalId})
+    if(!response){
+      res.status(401).json({
+        message:"some error occured"
+      })
+    }
+  
+    res.status(200).json({
+      message:"delete successfully."
+    })
+  }
+  else{
+    res.status(401).json({
+      message:"signal not found"
+    })  }
 
+  
+})
 
