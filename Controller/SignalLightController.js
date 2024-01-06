@@ -253,18 +253,20 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
       Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   const distance = R * c;
-  return distance; // Distance in kilometers
+  return distance*1000; // Distance in kilometers
 }
 
 exports.signalByCoordinates = catcherror(async (req, res) => {
   const { lat, lon, maxDistance } = req.body; // Latitude, longitude, and maximum distance in kilometers
+  let distances = []; // Array to store distances
+  let signals = []; // Array to store signals
 
   const latitude = parseFloat(lat);
   const longitude = parseFloat(lon);
   const distanceInRadians = maxDistance / 6371;
 
   // Find signals within the specified distance
-  const signals = await TrafficSignal.find({
+  const allSignals = await TrafficSignal.find({
     location: {
       $geoWithin: {
         $centerSphere: [[latitude, longitude], distanceInRadians], // Convert distance to radians
@@ -272,16 +274,20 @@ exports.signalByCoordinates = catcherror(async (req, res) => {
     },
   });
 
-  // Calculate distances for each signal and sort the signals array based on distances
-  signals.forEach((signal) => {
-    const distance = calculateDistance(
+  // Calculate distances for each signal
+  allSignals.forEach((signal) => {
+    const signalDistance = calculateDistance(
       lat,
       lon,
       signal.location.latitude,
       signal.location.longitude
     );
 
-    signal.distance = distance; // Add the distance property to the signal object
+    // Add the signal and distance to the arrays
+      signals.push(signal);
+      distances.push(signalDistance);
+    
+
     const elapsedTime = getElapsedTime(signal);
 
     const liveTime = getTrafficLightStatus(
@@ -293,12 +299,19 @@ exports.signalByCoordinates = catcherror(async (req, res) => {
     signal.aspects.durationInSeconds = liveTime.duration;
   });
 
-  // Sort signals by distance (ascending order)
-  signals.sort((a, b) => a.distance - b.distance);
+  // Sort signals and distances arrays based on distances
+  const sortedIndices = distances.map((_, index) => index);
+  sortedIndices.sort((a, b) => distances[a] - distances[b]);
+
+  signals = sortedIndices.map((index) => signals[index]);
+  distances = sortedIndices.map((index) => distances[index]);
+
   const signalCount = signals.length;
 
-  res.json({ success: true, signalCount, signals });
+  res.json({ success: true, signalCount, signals, distances });
 });
+
+
 
 // for retriving all signal with same circle.
 

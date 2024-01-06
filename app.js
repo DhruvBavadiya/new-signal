@@ -36,6 +36,5 @@ server.listen(process.env.PORT, () => {
 
 module.exports = {
   app,
-  io, // Export the io object
-  // Any other exports you may need
+  io,
 };
