@@ -90,12 +90,6 @@ exports.getAll = catcherror(async (req, res, next) => {
 exports.getSignalById = catcherror(async (req, res, next) => {
     const signalId = req.body.signalId;
     const signal = await TrafficSignal.findOne({ signalId });
-    if (!signal) {
-      return(
-      res.status(401).json({
-        message:"signal not found"
-      }))
-    }
   if(signal.signalStatus=="notworking"){
     return res.status(201).json({
       success:true,
@@ -103,6 +97,9 @@ exports.getSignalById = catcherror(async (req, res, next) => {
       signal
     })
   }
+    if (!signal) {
+      return next(new ErrorHandler("Signal not found"));
+    }
 
     const elapsedTime = getElapsedTime(signal);
 
@@ -256,6 +253,62 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
   return distance*1000; // Distance in kilometers
 }
 
+// exports.signalByCoordinates = catcherror(async (req, res) => {
+//   const { lat, lon, maxDistance } = req.body; // Latitude, longitude, and maximum distance in kilometers
+//   let distances = []; // Array to store distances
+//   let signals = []; // Array to store signals
+
+//   const latitude = parseFloat(lat);
+//   const longitude = parseFloat(lon);
+//   const distanceInRadians = maxDistance / 6371;
+//   console.log(distanceInRadians," ", maxDistance)
+//   // Find signals within the specified distance
+//   const allSignals = await TrafficSignal.find({
+//     location: {
+//       $geoWithin: {
+//         $centerSphere: [[latitude, longitude], distanceInRadians], // Convert distance to radians
+//       },
+//     },
+//   });
+
+//   // Calculate distances for each signal
+//   allSignals.forEach((signal) => {
+//     const signalDistance = calculateDistance(
+//       lat,
+//       lon,
+//       signal.location.latitude,
+//       signal.location.longitude
+//     );
+
+//       // Add the signal and distance to the arrays
+//       signals.push(signal);
+//       distances.push(signalDistance);
+        
+//       const elapsedTime = getElapsedTime(signal);
+
+//     const liveTime = getTrafficLightStatus(
+//       elapsedTime,
+//       signal.aspects.currentColor,
+//       signal.aspects.durationInSeconds
+//     );
+//     signal.aspects.currentColor = liveTime.color;
+//     signal.aspects.durationInSeconds = liveTime.duration;
+//   });
+
+//   // Sort signals and distances arrays based on distances
+//   const sortedIndices = distances.map((_, index) => index);
+//   sortedIndices.sort((a, b) => distances[a] - distances[b]);
+
+//   signals = sortedIndices.map((index) => signals[index]);
+//   distances = sortedIndices.map((index) => distances[index]);
+
+//   const signalCount = signals.length;
+
+//   res.json({ success: true, signalCount, signals, distances });
+// });
+
+const geolib = require("geolib");
+
 exports.signalByCoordinates = catcherror(async (req, res) => {
   const { lat, lon, maxDistance } = req.body; // Latitude, longitude, and maximum distance in kilometers
   let distances = []; // Array to store distances
@@ -263,53 +316,45 @@ exports.signalByCoordinates = catcherror(async (req, res) => {
 
   const latitude = parseFloat(lat);
   const longitude = parseFloat(lon);
-  const distanceInRadians = maxDistance / 6371;
+  const maxDistanceInMeters = maxDistance * 1000; // Convert maxDistance to meters
 
-  // Find signals within the specified distance
-  const allSignals = await TrafficSignal.find({
-    location: {
-      $geoWithin: {
-        $centerSphere: [[latitude, longitude], distanceInRadians], // Convert distance to radians
-      },
-    },
-  });
+  try {
+    // Find signals within the specified distance
+    const allSignals = await TrafficSignal.find();
 
-  // Calculate distances for each signal
-  allSignals.forEach((signal) => {
-    const signalDistance = calculateDistance(
-      lat,
-      lon,
-      signal.location.latitude,
-      signal.location.longitude
-    );
+    const signalsWithinDistance = allSignals.filter((signal) => {
+      if (signal.location && signal.location.latitude && signal.location.longitude) {
+        const signalDistance = geolib.getDistance(
+          { latitude, longitude },
+          {
+            latitude: signal.location.latitude,
+            longitude: signal.location.longitude,
+          }
+        );
+        signal.distance = signalDistance;
+        return signalDistance <= maxDistanceInMeters;
+      }
+      return false;
+    });
 
-    // Add the signal and distance to the arrays
-      signals.push(signal);
-      distances.push(signalDistance);
-    
+    // Sort signals within distance by distance (ascending order)
+    signalsWithinDistance.sort((a, b) => a.distance - b.distance);
 
-    const elapsedTime = getElapsedTime(signal);
+    // Extract distances for console logging
+    distances = signalsWithinDistance.map((signal) => signal.distance);
 
-    const liveTime = getTrafficLightStatus(
-      elapsedTime,
-      signal.aspects.currentColor,
-      signal.aspects.durationInSeconds
-    );
-    signal.aspects.currentColor = liveTime.color;
-    signal.aspects.durationInSeconds = liveTime.duration;
-  });
+    const signalCount = signalsWithinDistance.length;
 
-  // Sort signals and distances arrays based on distances
-  const sortedIndices = distances.map((_, index) => index);
-  sortedIndices.sort((a, b) => distances[a] - distances[b]);
+    console.log("Sorted Distances:", distances); // Console log sorted distances
 
-  signals = sortedIndices.map((index) => signals[index]);
-  distances = sortedIndices.map((index) => distances[index]);
-
-  const signalCount = signals.length;
-
-  res.json({ success: true, signalCount, signals, distances });
+    res.json({ success: true, signalCount, signals: signalsWithinDistance });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: "Internal Server Error" });
+  }
 });
+
+
 
 
 
@@ -367,26 +412,5 @@ exports.liveUpdateSignal = catcherror(async (req, res) => {
 });
 
 
-exports.DeleteSignal = catcherror(async(req,res)=>{
-  const SignalId = req.body.SignalId;
-  const signal = await TrafficSignal.findOne({signalId:SignalId})
-  if(signal){
-  const response = await TrafficSignal.deleteOne({signalId:SignalId})
-    if(!response){
-      res.status(401).json({
-        message:"some error occured"
-      })
-    }
-  
-    res.status(200).json({
-      message:"delete successfully."
-    })
-  }
-  else{
-    res.status(401).json({
-      message:"signal not found"
-    })  }
 
-  
-})
 

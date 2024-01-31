@@ -13,6 +13,7 @@ const trafficSignalSchema = new mongoose.Schema({
     angle: {
       type: Number,
       required: true,
+      default:0
     },
   },
   address: {

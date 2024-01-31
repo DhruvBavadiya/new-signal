@@ -4,6 +4,7 @@ const Circle = require("../Model/circleSchema");
 const TrafficSignal = require("../Model/trafficSignalSchema");
 // const { calculateDistance, getElapsedTime, getTrafficLightStatus } = require("./SignalLightController");
 
+const geolib = require('geolib');
 
 function getElapsedTime(signal) {
   const currentTime = new Date().getTime();
@@ -13,7 +14,7 @@ function getElapsedTime(signal) {
 }
 
 function calculateDistance(lat1, lon1, lat2, lon2) {
-  const R = 6371; // Radius of the Earth in kilometers
+  const R = 6371e3; // Radius of the Earth in meters
   const dLat = (lat2 - lat1) * (Math.PI / 180);
   const dLon = (lon2 - lon1) * (Math.PI / 180);
   const a =
@@ -24,7 +25,7 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
       Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   const distance = R * c;
-  return distance; // Distance in kilometers
+  return distance; // Distance in meters
 }
 
 
@@ -86,35 +87,90 @@ exports.DeleteCircle = catcherror(async(req,res,next)=>{
 
 })
 
-exports.getCircleByCoordinates = async(req,res)=>{
+// exports.getCircleByCoordinates = async (req, res) => {
+//   const { lat, lon, maxDistance } = req.body; // Latitude, longitude, and maximum distance in kilometers
+
+//   const latitude = parseFloat(lat);
+//   const longitude = parseFloat(lon);
+  
+//   // Convert maximum distance from kilometers to meters
+//   const maxDistanceInMeters = maxDistance * 1000;
+
+//   // Calculate distance in radians using maximum distance in meters
+//   const distanceInRadians = maxDistanceInMeters / 6371000; // 6371000 is the Earth's radius in meters
+//   console.log(distanceInRadians, " ", maxDistanceInMeters);
+
+//   const circles = await Circle.find({
+//     coordinates: {
+//       $geoWithin: {
+//         $centerSphere: [[latitude, longitude], distanceInRadians], // Convert distance to radians
+//       },
+//     },
+//   });
+
+//   circles.forEach((circle) => {
+//     const distance = calculateDistance(
+//       lat,
+//       lon,
+//       circle.coordinates.latitude,
+//       circle.coordinates.longitude
+//     );
+//     circle.distance = distance;
+//   });
+
+//   // Sort signals by distance (ascending order)
+//   circles.sort((a, b) => a.distance - b.distance);
+//   const circleCount = circles.length;
+
+//   // Log sorted distances
+//   const sortedDistances = circles.map((circle) => circle.distance);
+//   console.log("Sorted Distances:", sortedDistances);
+
+//   console.log(circleCount);
+//   res.json({ success: true, circleCount, circles });
+// };
+
+
+
+exports.getCircleByCoordinates = async (req, res) => {
   const { lat, lon, maxDistance } = req.body; // Latitude, longitude, and maximum distance in kilometers
 
   const latitude = parseFloat(lat);
   const longitude = parseFloat(lon);
-  const distanceInRadians = maxDistance / 6371;
 
-  const circles = await Circle.find({
-    coordinates: {
-      $geoWithin: {
-        $centerSphere: [[latitude, longitude], distanceInRadians], // Convert distance to radians
-      },
-    },
+  // Convert maximum distance from kilometers to meters
+  const maxDistanceInMeters = maxDistance * 1000;
+
+  // Define the coordinates of the center point
+  const centerPoint = { latitude, longitude };
+
+  // Fetch all circles from the database
+  const allCircles = await Circle.find();
+
+  // Filter circles within the specified radius
+  const circlesWithinRadius = allCircles.filter(circle => {
+    const circlePoint = { latitude: circle.coordinates.latitude, longitude: circle.coordinates.longitude };
+    const distance = geolib.getDistance(centerPoint, circlePoint); // Distance in meters
+    return distance <= maxDistanceInMeters;
   });
 
-  circles.forEach((circle) => {
-    const distance = calculateDistance(
-      lat,
-      lon,
-      circle.coordinates.latitude,
-      circle.coordinates.longitude
-    );
-    circle.distance = distance; 
+  // Sort circles by distance (ascending order)
+  circlesWithinRadius.sort((a, b) => {
+    const aPoint = { latitude: a.coordinates.latitude, longitude: a.coordinates.longitude };
+    const bPoint = { latitude: b.coordinates.latitude, longitude: b.coordinates.longitude };
+    const distanceA = geolib.getDistance(centerPoint, aPoint); // Distance in meters
+    const distanceB = geolib.getDistance(centerPoint, bPoint); // Distance in meters
+    return distanceA - distanceB;
   });
 
-  // Sort signals by distance (ascending order)
-  circles.sort((a, b) => a.distance - b.distance);
-  const circleCount = circles.length;
+  // Log sorted distances
+  const sortedDistances = circlesWithinRadius.map(circle => {
+    const circlePoint = { latitude: circle.coordinates.latitude, longitude: circle.coordinates.longitude };
+    return geolib.getDistance(centerPoint, circlePoint); // Distance in meters
+  });
+  console.log("Sorted Distances:", sortedDistances);
 
-  res.json({ success: true, circleCount, circles });
-}
+  const circleCount = circlesWithinRadius.length;
 
+  res.json({ success: true, circleCount, circles: circlesWithinRadius });
+};
