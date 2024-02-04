@@ -64,17 +64,20 @@ exports.updateSignal = async (req, res) => {
 
 exports.getAll = catcherror(async (req, res, next) => {
   const signals = await TrafficSignal.find();
-  const newsignals = signals.filter((signal)=>signal.signalStatus == "working")
+  const newsignals = signals.filter(
+    (signal) => signal.signalStatus == "working"
+  );
   if (newsignals) {
     newsignals.forEach((signal) => {
-    const elapsedTime = getElapsedTime(signal);
-    const liveTime = getTrafficLightStatus(
-      elapsedTime,
-      signal.aspects.currentColor,
-      signal.aspects.durationInSeconds
-    );
-    signal.aspects.currentColor = liveTime.color;
-    signal.aspects.durationInSeconds = liveTime.duration;
+      const elapsedTime = getElapsedTime(signal);
+      const liveTime = getTrafficLightStatus(
+        signal,
+        elapsedTime,
+        signal.aspects.currentColor,
+        signal.aspects.durationInSeconds
+      );
+      signal.aspects.currentColor = liveTime.color;
+      signal.aspects.durationInSeconds = liveTime.duration;
     });
 
     res.status(200).json({
@@ -86,68 +89,65 @@ exports.getAll = catcherror(async (req, res, next) => {
   }
 });
 
-
 exports.getSignalById = catcherror(async (req, res, next) => {
-    const signalId = req.body.signalId;
-    const signal = await TrafficSignal.findOne({ signalId });
-  if(signal.signalStatus=="notworking"){
+  const signalId = req.body.signalId;
+  const signal = await TrafficSignal.findOne({ signalId });
+  if (signal.signalStatus == "notworking") {
     return res.status(201).json({
-      success:true,
-      message:"signal not working",
-      signal
-    })
-  }
-    if (!signal) {
-      return next(new ErrorHandler("Signal not found"));
-    }
-
-    const elapsedTime = getElapsedTime(signal);
-
-    const liveTime = getTrafficLightStatus(
-      elapsedTime,
-      signal.aspects.currentColor,
-      signal.aspects.durationInSeconds
-    );
-    signal.aspects.currentColor = liveTime.color;
-    signal.aspects.durationInSeconds = liveTime.duration;
-    // await signal.save()
-    // console.log(liveTime)
-    res.status(200).json({
       success: true,
+      message: "signal not working",
       signal,
     });
+  }
+  if (!signal) {
+    return next(new ErrorHandler("Signal not found"));
+  }
+
+  const elapsedTime = getElapsedTime(signal);
+
+  const liveTime = getTrafficLightStatus(
+    signal,
+    elapsedTime,
+    signal.aspects.currentColor,
+    signal.aspects.durationInSeconds
+  );
+  signal.aspects.currentColor = liveTime.color;
+  signal.aspects.durationInSeconds = liveTime.duration;
+  // await signal.save()
+  // console.log(liveTime)
+  res.status(200).json({
+    success: true,
+    signal,
+  });
 });
 
-exports.signalOff = catcherror(async(req,res,next)=>{
+exports.signalOff = catcherror(async (req, res, next) => {
   // const signalId = req.Query.signalId
   // console.log(signalId)
-  const signal = await TrafficSignal.findOne({signalId:req.params.signalId})
-  console.log(signal)
-    signal.signalNotWorking.signalOfftime = Date.now();
-    signal.signalStatus = "notworking"
-    await signal.save();
+  const signal = await TrafficSignal.findOne({ signalId: req.params.signalId });
+  console.log(signal);
+  signal.signalNotWorking.signalOfftime = Date.now();
+  signal.signalStatus = "notworking";
+  await signal.save();
 
-    res.status(200).json({
-      message:"signal is off"
-    })
+  res.status(200).json({
+    message: "signal is off",
+  });
+});
+exports.signalOn = catcherror(async (req, res, next) => {
+  const signal = await TrafficSignal.findOne({ signalId: req.params.signalId });
+  signal.signalStatus = "working";
+  signal.signalNotWorking.signalOfftime = null;
+  (signal.aspects.currentColor = "red"),
+    (signal.aspects.durationInSeconds = 90);
+  await signal.save();
 
-})
-exports.signalOn = catcherror(async(req,res,next)=>{
-
-    const signal = await TrafficSignal.findOne({signalId:req.params.signalId})
-    signal.signalStatus = "working"
-    signal.signalNotWorking.signalOfftime = null
-    signal.aspects.currentColor = "red",
-    signal.aspects.durationInSeconds = 90
-    await signal.save()
-
-    res.status(200).json({
-      success:true,
-      message:"signal is on",
-      signal
-    })
-
-})
+  res.status(200).json({
+    success: true,
+    message: "signal is on",
+    signal,
+  });
+});
 
 // process of finding elapsedTime
 
@@ -201,12 +201,12 @@ function getElapsedTime(signal) {
 //   };
 // }
 
-function getTrafficLightStatus(elapsedTime, initialColor, initialDuration) {
+function getTrafficLightStatus(signal,elapsedTime, initialColor, initialDuration) {
   // Define the durations for each color
-  const redDuration = 80;
-  const yellowDuration = 5;
-  const greenDuration = 20;
-  
+  const redDuration = signal.aspects.red;
+  const yellowDuration = signal.aspects.yellow;
+  const greenDuration = signal.aspects.green;
+
   let elapTime = elapsedTime;
   let curcolor = initialColor;
   let colorduration = initialDuration;
@@ -215,15 +215,15 @@ function getTrafficLightStatus(elapsedTime, initialColor, initialDuration) {
     if (curcolor === "green") {
       curcolor = "yellow";
       elapTime -= colorduration;
-      colorduration = 5;
+      colorduration = yellowDuration;
     } else if (curcolor === "yellow") {
       curcolor = "red";
       elapTime -= colorduration;
-      colorduration = 80;
+      colorduration = redDuration;
     } else {
       curcolor = "green";
       elapTime -= colorduration;
-      colorduration = 20;
+      colorduration = greenDuration;
     }
   }
 
@@ -235,8 +235,6 @@ function getTrafficLightStatus(elapsedTime, initialColor, initialDuration) {
     };
   }
 }
-
-
 
 function calculateDistance(lat1, lon1, lat2, lon2) {
   const R = 6371; // Radius of the Earth in kilometers
@@ -250,7 +248,7 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
       Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   const distance = R * c;
-  return distance*1000; // Distance in kilometers
+  return distance * 1000; // Distance in kilometers
 }
 
 // exports.signalByCoordinates = catcherror(async (req, res) => {
@@ -283,7 +281,7 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
 //       // Add the signal and distance to the arrays
 //       signals.push(signal);
 //       distances.push(signalDistance);
-        
+
 //       const elapsedTime = getElapsedTime(signal);
 
 //     const liveTime = getTrafficLightStatus(
@@ -323,7 +321,11 @@ exports.signalByCoordinates = catcherror(async (req, res) => {
     const allSignals = await TrafficSignal.find();
 
     const signalsWithinDistance = allSignals.filter((signal) => {
-      if (signal.location && signal.location.latitude && signal.location.longitude) {
+      if (
+        signal.location &&
+        signal.location.latitude &&
+        signal.location.longitude
+      ) {
         const signalDistance = geolib.getDistance(
           { latitude, longitude },
           {
@@ -354,10 +356,6 @@ exports.signalByCoordinates = catcherror(async (req, res) => {
   }
 });
 
-
-
-
-
 // for retriving all signal with same circle.
 
 exports.getSignalsByCircleId = catcherror(async (req, res) => {
@@ -369,8 +367,9 @@ exports.getSignalsByCircleId = catcherror(async (req, res) => {
     if (signals) {
       signals.forEach((signal) => {
         const elapsedTime = getElapsedTime(signal);
-  
+
         const liveTime = getTrafficLightStatus(
+          signal,
           elapsedTime,
           signal.aspects.currentColor,
           signal.aspects.durationInSeconds
@@ -393,7 +392,7 @@ exports.getSignalsByCircleId = catcherror(async (req, res) => {
 
 exports.liveUpdateSignal = catcherror(async (req, res) => {
   const { durationInSeconds, currentColor } = req.body;
-  console.log(durationInSeconds)
+  console.log(durationInSeconds);
   try {
     const updatedSignal = await TrafficSignal.findByIdAndUpdate(
       req.params.Id,
@@ -411,6 +410,24 @@ exports.liveUpdateSignal = catcherror(async (req, res) => {
   }
 });
 
+exports.changeSignalTime = catcherror(async (req, res, next) => {
+  const signalId = req.body.Id;
+  const signal = await TrafficSignal.findOne({ signalId: signalId });
+  if (signal) {
+    const data = req.body;
 
+    signal.aspects.green = data.green;
+    signal.aspects.yellow = data.yellow;
+    signal.aspects.red = data.red;
+    signal.aspects.currentColor = 'red';
+    signal.aspects.durationInSeconds = data.red;
+    await signal.save();
+  } else {
+    return next(new ErrorHandler("No signal for this id.", 401));
+  }
 
-
+  res.status(201).json({
+    signal,
+    message: "success",
+  });
+});
