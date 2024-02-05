@@ -4,7 +4,7 @@ const Circle = require("../Model/circleSchema");
 const TrafficSignal = require("../Model/trafficSignalSchema");
 // const { calculateDistance, getElapsedTime, getTrafficLightStatus } = require("./SignalLightController");
 
-const geolib = require('geolib');
+const geolib = require("geolib");
 
 function getElapsedTime(signal) {
   const currentTime = new Date().getTime();
@@ -27,7 +27,6 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
   const distance = R * c;
   return distance; // Distance in meters
 }
-
 
 exports.addCircle = catcherror(async (req, res, next) => {
   const data = req.body;
@@ -59,11 +58,10 @@ exports.getCircle = catcherror(async (req, res, next) => {
   }
 });
 
-
-exports.getAllCircle = catcherror(async (req,res,next)=>{
+exports.getAllCircle = catcherror(async (req, res, next) => {
   const circle = await Circle.find();
 
-  if(circle){
+  if (circle) {
     res.status(200).json({
       success: true,
       circle,
@@ -71,28 +69,27 @@ exports.getAllCircle = catcherror(async (req,res,next)=>{
   } else {
     return next(new ErrorHandler("No circle found.", 401));
   }
-})
+});
 
-exports.DeleteCircle = catcherror(async(req,res,next)=>{
-  const {circleId} = req.body
-  const circle = await Circle.deleteOne({circleId:circleId})
+exports.DeleteCircle = catcherror(async (req, res, next) => {
+  const { circleId } = req.body;
+  const circle = await Circle.deleteOne({ circleId: circleId });
 
-  if(!circle){
+  if (!circle) {
     return next(new ErrorHandler("No circle found.", 401));
   }
 
   res.status(200).json({
-    success:true
-  })
-
-})
+    success: true,
+  });
+});
 
 // exports.getCircleByCoordinates = async (req, res) => {
 //   const { lat, lon, maxDistance } = req.body; // Latitude, longitude, and maximum distance in kilometers
 
 //   const latitude = parseFloat(lat);
 //   const longitude = parseFloat(lon);
-  
+
 //   // Convert maximum distance from kilometers to meters
 //   const maxDistanceInMeters = maxDistance * 1000;
 
@@ -130,8 +127,6 @@ exports.DeleteCircle = catcherror(async(req,res,next)=>{
 //   res.json({ success: true, circleCount, circles });
 // };
 
-
-
 exports.getCircleByCoordinates = async (req, res) => {
   const { lat, lon, maxDistance } = req.body; // Latitude, longitude, and maximum distance in kilometers
 
@@ -148,24 +143,36 @@ exports.getCircleByCoordinates = async (req, res) => {
   const allCircles = await Circle.find();
 
   // Filter circles within the specified radius
-  const circlesWithinRadius = allCircles.filter(circle => {
-    const circlePoint = { latitude: circle.coordinates.latitude, longitude: circle.coordinates.longitude };
+  const circlesWithinRadius = allCircles.filter((circle) => {
+    const circlePoint = {
+      latitude: circle.coordinates.latitude,
+      longitude: circle.coordinates.longitude,
+    };
     const distance = geolib.getDistance(centerPoint, circlePoint); // Distance in meters
     return distance <= maxDistanceInMeters;
   });
 
   // Sort circles by distance (ascending order)
   circlesWithinRadius.sort((a, b) => {
-    const aPoint = { latitude: a.coordinates.latitude, longitude: a.coordinates.longitude };
-    const bPoint = { latitude: b.coordinates.latitude, longitude: b.coordinates.longitude };
+    const aPoint = {
+      latitude: a.coordinates.latitude,
+      longitude: a.coordinates.longitude,
+    };
+    const bPoint = {
+      latitude: b.coordinates.latitude,
+      longitude: b.coordinates.longitude,
+    };
     const distanceA = geolib.getDistance(centerPoint, aPoint); // Distance in meters
     const distanceB = geolib.getDistance(centerPoint, bPoint); // Distance in meters
     return distanceA - distanceB;
   });
 
   // Log sorted distances
-  const sortedDistances = circlesWithinRadius.map(circle => {
-    const circlePoint = { latitude: circle.coordinates.latitude, longitude: circle.coordinates.longitude };
+  const sortedDistances = circlesWithinRadius.map((circle) => {
+    const circlePoint = {
+      latitude: circle.coordinates.latitude,
+      longitude: circle.coordinates.longitude,
+    };
     return geolib.getDistance(centerPoint, circlePoint); // Distance in meters
   });
   console.log("Sorted Distances:", sortedDistances);
@@ -174,3 +181,23 @@ exports.getCircleByCoordinates = async (req, res) => {
 
   res.json({ success: true, circleCount, circles: circlesWithinRadius });
 };
+
+exports.updateCircle = catcherror(async (req, res, next) => {
+  const circleId = req.body.circleId;
+  if (!circleId) {
+    return next(new ErrorHandler("circle id is not provided.", 401));
+  }
+  const circle = await Circle.findOne({ circleId: circleId });
+  if (!circle) {
+    return next(new ErrorHandler("No circle for this id..", 401));
+  }
+
+  circle.set(req.body);
+
+  const updatedCircle = await circle.save();
+  res.status(200).json({
+    success: true,
+    message: "Circle updated successfully",
+    data: updatedCircle,
+  });
+});
