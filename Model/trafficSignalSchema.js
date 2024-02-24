@@ -91,6 +91,9 @@ const trafficSignalSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+  side: { // Add the new field "side" here
+    type: String, // Adjust the type accordingly
+  },
   signalNotWorking: {
     signalOfftime: {
       type: Date,
