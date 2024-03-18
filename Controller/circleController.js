@@ -2,9 +2,12 @@ const catcherror = require("../Middleware/catcherror");
 const ErrorHandler = require("../Utils/errorHandler");
 const Circle = require("../Model/circleSchema");
 const TrafficSignal = require("../Model/trafficSignalSchema");
-// const { calculateDistance, getElapsedTime, getTrafficLightStatus } = require("./SignalLightController");
-
 const geolib = require("geolib");
+
+const NodeCache = require("node-cache");
+const cache = new NodeCache();
+const cacheDurationInSeconds = 600; // Adjust the cache duration as needed
+
 
 function getElapsedTime(signal) {
   const currentTime = new Date().getTime();
@@ -30,13 +33,15 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
 
 exports.addCircle = catcherror(async (req, res, next) => {
   const data = req.body;
-
   const circle = new Circle(data);
-
   const circleId = req.body.circleId;
-  // Save the circle with the updated signalIds
+
   try {
     const savedCircle = await circle.save();
+    
+    // Clear all circle-related cache
+    clearCircleCache();
+    
     res.status(201).json(savedCircle);
   } catch (error) {
     console.error(error);
@@ -46,158 +51,150 @@ exports.addCircle = catcherror(async (req, res, next) => {
 
 exports.getCircle = catcherror(async (req, res, next) => {
   const { circleId } = req.body;
-  const circle = await Circle.findOne({ circleId: circleId });
 
-  if (circle) {
+  try {
+    const cachedCircle = cache.get(circleId);
+    if (cachedCircle) {
+      return res.status(200).json({
+        success: true,
+        circle: JSON.parse(cachedCircle),
+        message: "Circle fetched from cache",
+      });
+    }
+
+    const circle = await Circle.findOne({ circleId: circleId });
+    if (!circle) {
+      return next(new ErrorHandler("No circle for this id.", 401));
+    }
+
+    cache.set(circleId, JSON.stringify(circle), cacheDurationInSeconds);
+
     res.status(200).json({
       success: true,
       circle,
     });
-  } else {
-    return next(new ErrorHandler("No circle for this id.", 401));
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: "Internal Server Error" });
   }
 });
 
 exports.getAllCircle = catcherror(async (req, res, next) => {
-  const circle = await Circle.find();
+  try {
+    const cachedCircles = cache.get("allCircles");
+    if (cachedCircles) {
+      return res.status(200).json({
+        success: true,
+        circles: JSON.parse(cachedCircles),
+        message: "Circles fetched from cache",
+      });
+    }
 
-  if (circle) {
+    const circles = await Circle.find();
+    if (!circles || circles.length === 0) {
+      return next(new ErrorHandler("No circles found.", 401));
+    }
+
+    cache.set("allCircles", JSON.stringify(circles), cacheDurationInSeconds);
+
     res.status(200).json({
       success: true,
-      circle,
+      circles,
     });
-  } else {
-    return next(new ErrorHandler("No circle found.", 401));
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: "Internal Server Error" });
   }
 });
 
 exports.DeleteCircle = catcherror(async (req, res, next) => {
   const { circleId } = req.body;
-  const circle = await Circle.deleteOne({ circleId: circleId });
 
-  if (!circle) {
-    return next(new ErrorHandler("No circle found.", 401));
+  try {
+    const circle = await Circle.deleteOne({ circleId: circleId });
+    if (!circle) {
+      return next(new ErrorHandler("No circle found.", 401));
+    }
+
+    // Clear all circle-related cache
+    clearCircleCache();
+
+    res.status(200).json({
+      success: true,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: "Internal Server Error" });
   }
-
-  res.status(200).json({
-    success: true,
-  });
 });
 
-// exports.getCircleByCoordinates = async (req, res) => {
-//   const { lat, lon, maxDistance } = req.body; // Latitude, longitude, and maximum distance in kilometers
-
-//   const latitude = parseFloat(lat);
-//   const longitude = parseFloat(lon);
-
-//   // Convert maximum distance from kilometers to meters
-//   const maxDistanceInMeters = maxDistance * 1000;
-
-//   // Calculate distance in radians using maximum distance in meters
-//   const distanceInRadians = maxDistanceInMeters / 6371000; // 6371000 is the Earth's radius in meters
-//   console.log(distanceInRadians, " ", maxDistanceInMeters);
-
-//   const circles = await Circle.find({
-//     coordinates: {
-//       $geoWithin: {
-//         $centerSphere: [[latitude, longitude], distanceInRadians], // Convert distance to radians
-//       },
-//     },
-//   });
-
-//   circles.forEach((circle) => {
-//     const distance = calculateDistance(
-//       lat,
-//       lon,
-//       circle.coordinates.latitude,
-//       circle.coordinates.longitude
-//     );
-//     circle.distance = distance;
-//   });
-
-//   // Sort signals by distance (ascending order)
-//   circles.sort((a, b) => a.distance - b.distance);
-//   const circleCount = circles.length;
-
-//   // Log sorted distances
-//   const sortedDistances = circles.map((circle) => circle.distance);
-//   console.log("Sorted Distances:", sortedDistances);
-
-//   console.log(circleCount);
-//   res.json({ success: true, circleCount, circles });
-// };
-
-exports.getCircleByCoordinates = async (req, res) => {
-  const { lat, lon, maxDistance } = req.body; // Latitude, longitude, and maximum distance in kilometers
-
+exports.getCircleByCoordinates = catcherror(async (req, res) => {
+  const { lat, lon, maxDistance } = req.body;
   const latitude = parseFloat(lat);
   const longitude = parseFloat(lon);
-
-  // Convert maximum distance from kilometers to meters
   const maxDistanceInMeters = maxDistance * 1000;
 
-  // Define the coordinates of the center point
-  const centerPoint = { latitude, longitude };
+  try {
+    const cacheKey = `${lat}_${lon}_${maxDistance}`;
+    const cachedResult = cache.get(cacheKey);
+    if (cachedResult) {
+      return res.json(JSON.parse(cachedResult));
+    }
 
-  // Fetch all circles from the database
-  const allCircles = await Circle.find();
+    const centerPoint = { latitude, longitude };
+    const boundingBox = geolib.getBoundsOfDistance(centerPoint, maxDistanceInMeters);
 
-  // Filter circles within the specified radius
-  const circlesWithinRadius = allCircles.filter((circle) => {
-    const circlePoint = {
-      latitude: circle.coordinates.latitude,
-      longitude: circle.coordinates.longitude,
-    };
-    const distance = geolib.getDistance(centerPoint, circlePoint); // Distance in meters
-    return distance <= maxDistanceInMeters;
-  });
+    const circlesWithinBoundingBox = await Circle.find({
+      'coordinates.latitude': { $gte: boundingBox[0].latitude, $lte: boundingBox[1].latitude },
+      'coordinates.longitude': { $gte: boundingBox[0].longitude, $lte: boundingBox[1].longitude }
+    });
 
-  // Sort circles by distance (ascending order)
-  circlesWithinRadius.sort((a, b) => {
-    const aPoint = {
-      latitude: a.coordinates.latitude,
-      longitude: a.coordinates.longitude,
-    };
-    const bPoint = {
-      latitude: b.coordinates.latitude,
-      longitude: b.coordinates.longitude,
-    };
-    const distanceA = geolib.getDistance(centerPoint, aPoint); // Distance in meters
-    const distanceB = geolib.getDistance(centerPoint, bPoint); // Distance in meters
-    return distanceA - distanceB;
-  });
+    const circlesWithinRadius = circlesWithinBoundingBox.filter(circle => {
+      const circlePoint = { latitude: circle.coordinates.latitude, longitude: circle.coordinates.longitude };
+      const distance = geolib.getDistance(centerPoint, circlePoint);
+      return distance <= maxDistanceInMeters;
+    });
 
-  // Log sorted distances
-  const sortedDistances = circlesWithinRadius.map((circle) => {
-    const circlePoint = {
-      latitude: circle.coordinates.latitude,
-      longitude: circle.coordinates.longitude,
-    };
-    return geolib.getDistance(centerPoint, circlePoint); // Distance in meters
-  });
-  console.log("Sorted Distances:", sortedDistances);
+    cache.set(cacheKey, JSON.stringify({ success: true, circleCount: circlesWithinRadius.length, circles: circlesWithinRadius }), cacheDurationInSeconds);
 
-  const circleCount = circlesWithinRadius.length;
+    res.json({ success: true, circleCount: circlesWithinRadius.length, circles: circlesWithinRadius });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: "Internal Server Error" });
+  }
+});
 
-  res.json({ success: true, circleCount, circles: circlesWithinRadius });
-};
 
 exports.updateCircle = catcherror(async (req, res, next) => {
   const circleId = req.body.circleId;
   if (!circleId) {
-    return next(new ErrorHandler("circle id is not provided.", 401));
-  }
-  const circle = await Circle.findOne({ circleId: circleId });
-  if (!circle) {
-    return next(new ErrorHandler("No circle for this id..", 401));
+    return next(new ErrorHandler("Circle id is not provided.", 401));
   }
 
-  circle.set(req.body);
+  try {
+    const circle = await Circle.findOne({ circleId: circleId });
+    if (!circle) {
+      return next(new ErrorHandler("No circle for this id.", 401));
+    }
 
-  const updatedCircle = await circle.save();
-  res.status(200).json({
-    success: true,
-    message: "Circle updated successfully",
-    data: updatedCircle,
-  });
+    circle.set(req.body);
+    const updatedCircle = await circle.save();
+
+    // Clear all circle-related cache
+    clearCircleCache();
+
+    res.status(200).json({
+      success: true,
+      message: "Circle updated successfully",
+      data: updatedCircle,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: "Internal Server Error" });
+  }
 });
+
+function clearCircleCache() {
+  const keys = cache.keys();
+  keys.forEach(key => cache.del(key));
+}
