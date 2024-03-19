@@ -895,8 +895,6 @@ exports.getAll = catcherror(async (req, res, next) => {
           signal.aspects.durationInSeconds = liveTime.duration;
         });
 
-        console.log(signals); // Log the original signals
-
         // Stringify the signals array before storing it in the cache
         const signalsString = JSON.stringify(signals);
         cache.set("allSignals", signalsString, cacheDurationInSeconds);
@@ -977,7 +975,6 @@ exports.getSignalById = catcherror(async (req, res, next) => {
 
 exports.signalOff = catcherror(async (req, res, next) => {
   const signal = await TrafficSignal.findOne({ signalId: req.params.signalId });
-  console.log(signal);
   signal.signalNotWorking.signalOfftime = Date.now();
   signal.signalStatus = "notworking";
   await signal.save();
